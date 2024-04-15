@@ -1,16 +1,15 @@
-#  Copyright 2021 ETH Zurich, NVIDIA CORPORATION
-#  SPDX-License-Identifier: BSD-3-Clause
 
 from __future__ import annotations
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 from rsl_rl.modules.actor_critic import ActorCritic, get_activation
 from rsl_rl.utils import unpad_trajectories
 
 
-class ActorCriticRecurrent(ActorCritic):
+class ActorCriticRecurrentAttention(ActorCritic):
     is_recurrent = True
 
     def __init__(
@@ -70,6 +69,7 @@ class ActorCriticRecurrent(ActorCritic):
         return self.memory_a.hidden_states, self.memory_c.hidden_states
 
 
+
 class Memory(torch.nn.Module):
     def __init__(self, input_size, type="lstm", num_layers=1, hidden_size=256):
         super().__init__()
@@ -89,11 +89,10 @@ class Memory(torch.nn.Module):
         else:
             # inference mode (collection): use hidden states of last step
             out, self.hidden_states = self.rnn(input.unsqueeze(0), self.hidden_states)
-            
-        # print(f"out.shape: {out.shape}")
         return out
 
     def reset(self, dones=None):
         # When the RNN is an LSTM, self.hidden_states_a is a list with hidden_state and cell_state
         for hidden_state in self.hidden_states:
             hidden_state[..., dones, :] = 0.0
+
