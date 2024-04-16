@@ -56,7 +56,8 @@ class ActorCriticRecurrent(ActorCritic):
 
     def act(self, observations, masks=None, hidden_states=None):
         input_a = self.memory_a(observations, masks, hidden_states)
-        return super().act(input_a.squeeze(0))
+        actions = super().act(input_a.squeeze(0))
+        return actions
 
     def act_inference(self, observations):
         input_a = self.memory_a(observations)
@@ -86,11 +87,12 @@ class Memory(torch.nn.Module):
                 raise ValueError("Hidden states not passed to memory module during policy update")
             out, _ = self.rnn(input, hidden_states)
             out = unpad_trajectories(out, masks)
+
         else:
             # inference mode (collection): use hidden states of last step
             out, self.hidden_states = self.rnn(input.unsqueeze(0), self.hidden_states)
+
             
-        # print(f"out.shape: {out.shape}")
         return out
 
     def reset(self, dones=None):
