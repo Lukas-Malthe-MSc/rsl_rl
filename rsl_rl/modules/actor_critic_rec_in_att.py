@@ -44,12 +44,13 @@ class ActorCriticInputAttention(ActorCritic):
         print("* IO ATTENTION TIME | IO ATTENTION TIME | IO ATTENTION TIME | IO ATTENTION TIME *")
         print("*********************************************************************************")
 
+
         activation = get_activation(activation)
 
         self.attention = InputAttention(input_dim=num_actor_obs, hidden_dim=rnn_hidden_size, num_heads=4)
 
-        self.memory_a = Memory(num_actor_obs, type=rnn_type, num_layers=rnn_num_layers, hidden_size=rnn_hidden_size)
-        self.memory_c = Memory(num_critic_obs, type=rnn_type, num_layers=rnn_num_layers, hidden_size=rnn_hidden_size)
+        self.memory_a = Memory(rnn_hidden_size, type=rnn_type, num_layers=rnn_num_layers, hidden_size=rnn_hidden_size)
+        self.memory_c = Memory(rnn_hidden_size, type=rnn_type, num_layers=rnn_num_layers, hidden_size=rnn_hidden_size)
 
         # self.memory_a = Memory(num_actor_obs, type=rnn_type, num_layers=rnn_num_layers, hidden_size=rnn_hidden_size)
         # self.memory_c = Memory(num_critic_obs, type=rnn_type, num_layers=rnn_num_layers, hidden_size=rnn_hidden_size)
@@ -65,29 +66,13 @@ class ActorCriticInputAttention(ActorCritic):
 
     def act(self, observations, masks=None, hidden_states=None):
 
-        # print(f"shape before attention: {observations.shape}, {masks}, {hidden_states}")
-        # attenede_inputs = self.attention(observations)
-        # print(f"shape after attention: {attenede_inputs.shape}")
+        attenede_inputs = self.attention(observations)
+        actor_hidden = self.memory_a(attenede_inputs, masks, hidden_states)
 
-
-        actor_hidden = self.memory_a(observations, masks, hidden_states)
-
-        print(f"shape after mem_a: {actor_hidden.shape}")
+        # print(f"shape after mem_a: {actor_hidden.shape}")
         action_output = super().act(actor_hidden.squeeze(0))
 
         return action_output
-
-        """""""""
-
-        # Apply attention to input observations
-        print(f"Observations: {observations.shape}")
-        attended_inputs = self.attention(observations)
-        
-        # Process attended inputs with LSTM (memory)
-        input_a = self.memory_a(attended_inputs, masks, hidden_states)
-        action_output = super().act(input_a.squeeze(0))
-        return action_output
-        """""""""
 
    
     # TODO: Update this function
@@ -104,7 +89,8 @@ class ActorCriticInputAttention(ActorCritic):
 
     def evaluate(self, critic_observations, masks=None, hidden_states=None):
         # Print shape of all inputs
-        critic_hidden = self.memory_c(critic_observations, masks, hidden_states)
+        attenede_inputs = self.attention(critic_observations)
+        critic_hidden = self.memory_c(attenede_inputs, masks, hidden_states)
 
         value_output = super().evaluate(critic_hidden.squeeze(0))
         return value_output
@@ -138,7 +124,6 @@ class Memory(torch.nn.Module):
             out = unpad_trajectories(out, masks)
         else:
             # inference mode (collection): use hidden states of last step
-            print("why did i get here")
             out, self.hidden_states = self.rnn(input.unsqueeze(0), self.hidden_states)
         return out
 
