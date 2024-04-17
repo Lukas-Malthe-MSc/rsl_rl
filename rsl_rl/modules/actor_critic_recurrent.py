@@ -9,6 +9,7 @@ import torch.nn as nn
 from rsl_rl.modules.actor_critic import ActorCritic, get_activation
 from rsl_rl.utils import unpad_trajectories
 
+from rich import print
 
 class ActorCriticRecurrent(ActorCritic):
     is_recurrent = True
@@ -54,7 +55,7 @@ class ActorCriticRecurrent(ActorCritic):
         self.memory_a.reset(dones)
         self.memory_c.reset(dones)
 
-    def act(self, observations, masks=None, hidden_states=None):
+    def act(self, observations, masks=None, hidden_states=None):  
         input_a = self.memory_a(observations, masks, hidden_states)
         actions = super().act(input_a.squeeze(0))
         return actions
@@ -92,10 +93,11 @@ class Memory(torch.nn.Module):
             # inference mode (collection): use hidden states of last step
             out, self.hidden_states = self.rnn(input.unsqueeze(0), self.hidden_states)
 
-            
         return out
 
     def reset(self, dones=None):
         # When the RNN is an LSTM, self.hidden_states_a is a list with hidden_state and cell_state
         for hidden_state in self.hidden_states:
             hidden_state[..., dones, :] = 0.0
+            
+            

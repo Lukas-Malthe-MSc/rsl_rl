@@ -4,7 +4,6 @@ import torch.nn as nn
 from rsl_rl.modules.actor_critic import ActorCritic, get_activation
 
 class ActorCriticTransformer(ActorCritic):
-    is_transformer = True
     def __init__(
         self,
         num_actor_obs,  # input size of actor transformer
@@ -34,6 +33,7 @@ class ActorCriticTransformer(ActorCritic):
         )
         
         activation = get_activation(activation)
+        self.is_transformer = True
         
         # Initialize transformers
         self.transformer_a = Transformer(num_actor_obs, transformer_dim, num_heads, transformer_layers, transformer_dim)
@@ -43,16 +43,16 @@ class ActorCriticTransformer(ActorCritic):
         print(f"Critic Transformer: {self.transformer_c}")
 
 
-    def act(self, observations, masks=None, **kwargs):
-        input_a = self.transformer_a(observations, masks)
+    def act(self, observations, **kwargs):
+        input_a = self.transformer_a(observations)
         return super().act(input_a)
 
     def act_inference(self, observations):
         input_a = self.transformer_a(observations)
         return super().act_inference(input_a)
 
-    def evaluate(self, critic_observations, masks=None, **kwargs):
-        input_c = self.transformer_c(critic_observations, masks)
+    def evaluate(self, critic_observations, **kwargs):
+        input_c = self.transformer_c(critic_observations)
         return super().evaluate(input_c)
     
     def reset(self, dones=None):
@@ -62,7 +62,7 @@ class ActorCriticTransformer(ActorCritic):
 
 
 class Transformer(nn.Module):
-    def __init__(self, input_dim, model_dim, num_heads, num_layers, output_dim, max_seq_len=24):
+    def __init__(self, input_dim, model_dim, num_heads, num_layers, output_dim):
         super(Transformer, self).__init__()
         self.input_projection = nn.Linear(input_dim, model_dim)
         self.transformer_encoder = nn.TransformerEncoder(
@@ -71,34 +71,18 @@ class Transformer(nn.Module):
         )
         self.output_projection = nn.Linear(model_dim, output_dim)
         
-        self.max_seq_len = max_seq_len
-        self.buffers = None
+        self.x_buffer = None
 
-    def forward(self, x, masks=None):
-        batch_mode = masks is not None
-
-        if not batch_mode:
-            if self.buffers is None:
-                self.buffers = torch.zeros(self.max_seq_len, x.size(0), x.size(1), device=x.device)
-
-            # Update buffers with new observations, shifting older data
-            self.buffers = torch.roll(self.buffers, shifts=-1, dims=0)
-            self.buffers[-1, :, :] = x  # Add new observation at the end of the buffer
-
-            # Create masks based on valid data counts
-            valid_data_counts = (self.buffers != 0).any(dim=2).long().sum(dim=0)
-            masks = torch.arange(self.max_seq_len, device=x.device).expand(x.size(0), self.max_seq_len) >= valid_data_counts.unsqueeze(1)
-            x = self.buffers
-
-        # Project the input
+    def forward(self, x):
+        # print(f"Input shape: {x.shape}")
         x = self.input_projection(x)
-        x = self.transformer_encoder(x, src_key_padding_mask=masks) if not batch_mode else self.transformer_encoder(x)
+        x = x.unsqueeze(0)  # Add batch dimension
+        x = self.transformer_encoder(x)
+        x = x.squeeze(0)
         x = self.output_projection(x)
-        x = torch.mean(x, dim=0)       # Average pooling across the timesteps, output shape [num_envs, output_dim]
+        print(f"Output shape: {x.shape}")
         return x
 
-
-    def reset(self, dones):
-        # Reset buffers for environments that are done
-        if self.buffers is not None and dones is not None:
-            self.buffers[dones] = 0
+    def reset(self, dones=None):
+        # No state to reset in standard transformer, but method exists for interface compatibility
+        pass
