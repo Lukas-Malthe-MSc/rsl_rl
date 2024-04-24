@@ -103,8 +103,8 @@ class PPO:
         mean_surrogate_loss = 0
         if self.actor_critic.is_recurrent:
             generator = self.storage.reccurent_mini_batch_generator(self.num_mini_batches, self.num_learning_epochs)
-        elif self.actor_critic.is_transformer:
-            generator = self.storage.transformer_mini_batch_generator(self.num_mini_batches, self.num_learning_epochs)
+        # elif self.actor_critic.is_transformer:
+        #     generator = self.storage.transformer_mini_batch_generator(self.num_mini_batches, self.num_learning_epochs)
         else:
             generator = self.storage.mini_batch_generator(self.num_mini_batches, self.num_learning_epochs)
         for (
