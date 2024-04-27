@@ -9,6 +9,5 @@ from .normalizer import EmpiricalNormalization
 from .actor_critic_transformer import ActorCriticTransformer
 from .actor_critic_self_attention import ActorCriticSelfAttention
 from .actor_critic_lidar_cnn import ActorCriticLidarCnn
-from .actor_critic_ViT import ActorCriticViT
 
-__all__ = ["ActorCritic", "ActorCriticRecurrent", "EmpiricalNormalization", "ActorCriticTransformer", "ActorCriticSelfAttention", "ActorCriticLidarCnn", "ActorCriticViT"]
+__all__ = ["ActorCritic", "ActorCriticRecurrent", "EmpiricalNormalization", "ActorCriticTransformer", "ActorCriticSelfAttention", "ActorCriticLidarCnn"]

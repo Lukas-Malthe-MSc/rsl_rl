@@ -5,9 +5,9 @@ from __future__ import annotations
 
 import torch
 import torch.nn as nn
+import numpy as np
 
 from rsl_rl.modules.actor_critic import ActorCritic, get_activation
-
 
 from rich import print
 
@@ -41,8 +41,8 @@ class ActorCriticLidarCnn(ActorCritic):
         
         activation = get_activation(activation)
 
-        self.lidar_cnn_a = LidarCnn(input_size=num_actor_obs, num_lidar_scans=num_lidar_scans, kernel_size=kernel_size, out_channels=out_channels)
-        self.lidar_cnn_c = LidarCnn(input_size=num_critic_obs, num_lidar_scans=num_lidar_scans, kernel_size=kernel_size, out_channels=out_channels)
+        self.lidar_cnn_a = LidarCnn(input_size=num_actor_obs, num_lidar_scans=num_lidar_scans, kernel_size=kernel_size, out_channels=out_channels, activation=activation)
+        self.lidar_cnn_c = LidarCnn(input_size=num_critic_obs, num_lidar_scans=num_lidar_scans, kernel_size=kernel_size, out_channels=out_channels, activation=activation)
         
         self.actor.insert(0, self.lidar_cnn_a)
         self.critic.insert(0, self.lidar_cnn_c)
@@ -57,16 +57,35 @@ class ActorCriticLidarCnn(ActorCritic):
         return super().act(observations=observations)
 
     def act_inference(self, observations):
-        return super().act_inference(observations=observations)
+        output = super().act_inference(observations=observations)
+        
+        # try:
+        #     activations = self.get_activations(observations)
+        #     np.save("data-analysis/data/activations.npy", activations)
+        # except RuntimeError as e:
+        #     print(f"Error generating saliency map: {e}")
+        
+        return output
 
     def evaluate(self, critic_observations, **kwargs):
         return super().evaluate(critic_observations=critic_observations)
 
 
+    def get_activations(self, observations):
+        """Retrieve activations from the LiDAR CNN layers."""
+        activations = []
+
+        # Forward pass through the actor CNN
+        x = observations[:, :1081].unsqueeze(1)  # (batch_size, 1, num_lidar_scans)
+        for layer in self.lidar_cnn_a.pipeline:
+            x = layer(x)
+            activations.append(x.detach().squeeze(0).cpu().numpy())  # Store the activation
+        
+        return activations
 
 
 class LidarCnn(nn.Module):
-    def __init__(self, input_size, num_lidar_scans, kernel_size, out_channels):
+    def __init__(self, input_size, num_lidar_scans, kernel_size, out_channels, activation):
         super().__init__()
         self.num_lidar_scans = num_lidar_scans
         self.in_features = input_size
@@ -75,17 +94,17 @@ class LidarCnn(nn.Module):
 
         # First convolution layer
         layers.append(nn.Conv1d(in_channels=1, out_channels=out_channels, kernel_size=kernel_size, stride=2))
-        layers.append(nn.ReLU())  # Add activation function
+        layers.append(activation)  # Add activation function
         
         layers.append(nn.MaxPool1d(kernel_size=2))  # Add pooling layer
         
         layers.append(nn.Conv1d(in_channels=out_channels, out_channels=out_channels*2, kernel_size=kernel_size, stride=2))
-        layers.append(nn.ReLU())  # Add activation function
+        layers.append(activation)  # Add activation function
         
         layers.append(nn.MaxPool1d(kernel_size=2))  # Add pooling layer
         
         layers.append(nn.Conv1d(in_channels=out_channels*2, out_channels=out_channels*2, kernel_size=kernel_size, stride=2))
-        layers.append(nn.ReLU())  # Add activation function
+        layers.append(activation)  # Add activation function
         
         layers.append(nn.MaxPool1d(kernel_size=2))  # Add pooling layer
         
@@ -113,42 +132,3 @@ class LidarCnn(nn.Module):
         x = torch.cat([x_lidar, x_remaining], dim=1)  # Ensure compatible shape
         
         return x
-
-
-
-
-
-
-
-
-
-# class LidarCnn(torch.nn.Module):
-#     def __init__(self, input_size, num_lidar_scans, kernel_size, out_channels):
-#         super().__init__()
-#         self.in_features = input_size
-#         self.num_lidar_scans = num_lidar_scans
-#         self.conv1d = nn.Conv1d(in_channels=1, out_channels=out_channels, kernel_size=kernel_size)
-#         self.activation = nn.ReLU()
-        
-#     def forward(self, x):
-#         # Ensure x has the expected shape for Conv1d
-#         x_lidar = x[:, :self.num_lidar_scans].unsqueeze(1)  # (batch_size, 1, num_lidar_scans)
-        
-#         # Apply convolution
-#         x_lidar = self.conv1d(x_lidar)  # (batch_size, out_channels, new_length)
-#         x_lidar = self.activation(x_lidar)
-        
-#         # Flatten the 3D tensor into 2D
-#         x_lidar = x_lidar.view(x_lidar.size(0), -1)  # (batch_size, out_channels * new_length)
-        
-#         # Remaining data
-#         x_remaining = x[:, self.num_lidar_scans:]  # (batch_size, remaining_data_size)
-        
-#         # Concatenate along the feature dimension
-#         x = torch.cat([x_lidar, x_remaining], dim=1)  # (batch_size, total_features)
-        
-#         return x
-
-
-#     def reset(self, dones=None):
-#         pass
