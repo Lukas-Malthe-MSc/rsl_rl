@@ -21,8 +21,8 @@ class ActorCriticLidarCnn(ActorCritic):
         critic_hidden_dims=[256, 256, 256],
         activation="elu",
         num_lidar_scans=1081,
-        lidar_cnn_out_dim=486,
-        kernel_size=3,
+        lidar_cnn_out_dim=485,
+        kernel_size=5,
         out_channels=32,
         init_noise_std=1.0,
         **kwargs,
@@ -49,6 +49,12 @@ class ActorCriticLidarCnn(ActorCritic):
         
         print(f"Actor CNN: {self.actor}")
         print(f"Critic CNN: {self.critic}")
+        
+        total_params_actor = sum(p.numel() for p in self.actor.parameters() if p.requires_grad)
+        print(f"Total trainable parameters in Actor: {total_params_actor}")
+        
+        total_params_critic = sum(p.numel() for p in self.critic.parameters() if p.requires_grad)
+        print(f"Total trainable parameters in Critic: {total_params_critic}")
 
     def reset(self, dones=None):
         pass
@@ -60,10 +66,12 @@ class ActorCriticLidarCnn(ActorCritic):
         output = super().act_inference(observations=observations)
         
         # try:
+        #     lidar= observations[:, :1081]
         #     activations = self.get_activations(observations)
-        #     np.save("data-analysis/data/activations.npy", activations)
+        #     np.save("data-analysis/data/lidar_2.npy", lidar.cpu().numpy())
+        #     np.save("data-analysis/data/activations_2.npy", np.array(activations, dtype=object))
         # except RuntimeError as e:
-        #     print(f"Error generating saliency map: {e}")
+        #     print(f"Error generating activations: {e}")
         
         return output
 
